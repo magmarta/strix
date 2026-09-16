@@ -1,0 +1,14 @@
+[Unit]
+Description=Strix Pentest Web Panel
+After=network.target docker.service
+Wants=docker.service
+[Service]
+Type=simple
+WorkingDirectory=/opt/pentest/webpanel
+Environment=PANEL_PORT=80
+ExecStart=/usr/bin/python3 /opt/pentest/webpanel/app.py
+Restart=on-failure
+RestartSec=3
+User=root
+[Install]
+WantedBy=multi-user.target

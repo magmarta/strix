@@ -1,0 +1,302 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Strix Pentest Paneli</title>
+<style>
+:root{--bg:#0b1020;--card:#141b31;--card2:#0e1526;--acc:#3ba0ff;--txt:#e6ecf5;--mut:#8a97b0;
+--line:#26314d;--ok:#31c48d;--warn:#f5b955;--bad:#ff6b81}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;
+background:radial-gradient(1000px 500px at 85% -10%,#16224a,transparent),var(--bg);color:var(--txt)}
+body{background:radial-gradient(1000px 500px at 85% -12%,#16224a,transparent),var(--bg)}
+header{display:flex;align-items:center;gap:16px;padding:14px 22px;border-bottom:1px solid var(--line);
+position:sticky;top:0;background:rgba(11,16,32,.9);backdrop-filter:blur(8px);z-index:10}
+.logo{font-size:20px;font-weight:800;letter-spacing:1px}.logo span{color:var(--acc)}
+.tabs{display:flex;gap:6px;margin-left:14px}
+.tab{padding:8px 15px;border-radius:8px;color:var(--mut);cursor:pointer;font-size:13.5px;font-weight:600}
+.tab.on{background:var(--card);color:var(--txt)}
+.sp{flex:1}.usr{color:var(--mut);font-size:13px}.usr b{color:var(--txt)}
+a.lg{color:var(--acc);text-decoration:none;font-size:13px;margin-left:14px}
+.wrap{max-width:1000px;margin:26px auto;padding:0 18px}
+.steps{display:flex;gap:8px;margin-bottom:22px}
+.step{flex:1;height:6px;border-radius:4px;background:var(--line)}.step.on{background:var(--acc)}
+h2{font-size:19px;margin:0 0 4px}.desc{color:var(--mut);font-size:13px;margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px}
+label{display:block;font-size:12px;color:var(--mut);margin:14px 0 6px}
+input,select,textarea{width:100%;padding:11px 13px;border-radius:9px;border:1px solid var(--line);
+background:var(--card2);color:var(--txt);font-size:14px;outline:none;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:var(--acc)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grp{margin-top:18px}.grp h4{font-size:13px;color:var(--acc);margin:0 0 10px;text-transform:uppercase;letter-spacing:.5px}
+.caps{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.cap{background:var(--card2);border:1.5px solid var(--line);border-radius:11px;padding:13px;cursor:pointer;
+transition:.12s;position:relative}
+.cap:hover{border-color:#3a4a72}
+.cap.sel{border-color:var(--acc);background:#12203c}
+.cap .ik{font-size:20px}.cap .nm{font-weight:700;font-size:13.5px;margin:6px 0 3px}
+.cap .ac{font-size:11.5px;color:var(--mut);line-height:1.45}
+.cap .ck{position:absolute;top:10px;right:11px;width:18px;height:18px;border-radius:50%;
+border:1.5px solid var(--line);display:grid;place-items:center;font-size:11px;color:#03122a}
+.cap.sel .ck{background:var(--acc);border-color:var(--acc)}
+.modes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.mode{background:var(--card2);border:1.5px solid var(--line);border-radius:11px;padding:14px;cursor:pointer;text-align:center}
+.mode.sel{border-color:var(--acc);background:#12203c}.mode b{display:block;font-size:14px}.mode small{color:var(--mut);font-size:11px}
+.nav{display:flex;justify-content:space-between;margin-top:22px}
+button{padding:11px 20px;border:0;border-radius:9px;font-weight:700;font-size:14px;cursor:pointer}
+.pri{background:var(--acc);color:#03122a}.pri:hover{filter:brightness(1.08)}
+.sec{background:var(--card2);color:var(--txt);border:1px solid var(--line)}
+.pri:disabled{opacity:.45;cursor:not-allowed}
+.sum{display:grid;grid-template-columns:150px 1fr;gap:8px 14px;font-size:13.5px}
+.sum div:nth-child(odd){color:var(--mut)}
+.chip{display:inline-block;background:#12203c;border:1px solid var(--line);border-radius:20px;
+padding:3px 11px;font-size:12px;margin:2px 4px 2px 0}
+.warnbox{background:#3a2e14;border:1px solid #6b5522;color:var(--warn);padding:10px 13px;border-radius:9px;font-size:12.5px;margin-top:14px}
+/* ilerleme */
+.stat{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:14px}
+.dot{width:9px;height:9px;border-radius:50%}
+.run .dot{background:var(--warn);animation:pulse 1s infinite}.done .dot{background:var(--ok)}
+.fail .dot{background:var(--bad)}@keyframes pulse{50%{opacity:.3}}
+pre.log{background:#070b16;border:1px solid var(--line);border-radius:10px;padding:14px;
+font-size:12px;line-height:1.5;max-height:52vh;overflow:auto;white-space:pre-wrap;color:#cdd7ea}
+.dl{display:inline-flex;align-items:center;gap:8px;background:var(--ok);color:#04231a;padding:12px 20px;
+border-radius:9px;text-decoration:none;font-weight:700;margin-top:16px}
+/* gecmis */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line)}
+th{color:var(--mut);font-weight:600;font-size:12px}
+.badge{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.b-done{background:#12331f;color:var(--ok)}.b-run{background:#33280f;color:var(--warn)}
+.b-fail{background:#331319;color:var(--bad)}
+.mini{padding:6px 12px;font-size:12px}
+.hidden{display:none}
+@media(max-width:620px){.row,.modes{grid-template-columns:1fr}}
+</style></head><body>
+<header>
+  <div class="logo">🦉 STR<span>IX</span></div>
+  <div class="tabs">
+    <div class="tab on" id="t-yeni" onclick="showTab('yeni')">＋ Yeni Tarama</div>
+    <div class="tab" id="t-gecmis" onclick="showTab('gecmis');loadRuns()">🗂 Geçmiş</div>
+  </div>
+  <div class="sp"></div>
+  <div class="usr">👤 <b>{{user}}</b></div>
+  <a class="lg" href="/logout">Çıkış</a>
+</header>
+
+<div class="wrap">
+  <!-- ================= WIZARD ================= -->
+  <div id="pane-yeni">
+    <div class="steps"><div class="step on" data-s="0"></div><div class="step" data-s="1"></div>
+      <div class="step" data-s="2"></div><div class="step" data-s="3"></div></div>
+
+    <!-- Adim 1: Hedef -->
+    <div class="card scr" id="s0">
+      <h2>1 · Hedef Bilgileri</h2>
+      <div class="desc">Test edilecek hedefi ve müşteri bilgilerini girin.</div>
+      <div class="row">
+        <div><label>Firma / Müşteri</label><input id="firma" placeholder="ACME A.Ş."></div>
+        <div><label>Uygulama / Proje Adı</label><input id="app" placeholder="webuygulamasi"></div>
+      </div>
+      <div class="row">
+        <div><label>Hedef IP / Host</label><input id="ip" placeholder="192.168.55.20"></div>
+        <div><label>Web Uygulama URL (opsiyonel)</label><input id="url" placeholder="http://192.168.55.20:5001"></div>
+      </div>
+      <div style="margin-top:18px;padding:15px;border:1.5px solid var(--acc);border-radius:12px;background:#12203c">
+        <div style="font-size:13.5px;font-weight:700;color:var(--acc);margin-bottom:4px">🔑 Kimlik Bilgileri</div>
+        <div style="font-size:11.5px;color:var(--mut);margin-bottom:10px">Opsiyonel — verilirse Strix bu bilgilerle giriş yapıp <b>oturum açmış (authenticated)</b> testleri farklı yöntemlerle (web formu, HTTP Basic, API token, SSH) dener.</div>
+        <div class="row">
+          <div><label>Kullanıcı Adı</label><input id="kullanici" placeholder="admin"></div>
+          <div><label>Parola</label><input id="parola" placeholder="admin"></div>
+        </div>
+      </div>
+      <div class="nav"><span></span><button class="pri" onclick="go(1)">Devam →</button></div>
+    </div>
+
+    <!-- Adim 2: Kabiliyetler -->
+    <div class="card scr hidden" id="s1">
+      <h2>2 · Strix Kabiliyetleri</h2>
+      <div class="desc">Uygulanacak sızma testi türlerini seçin. Strix her seçimi otonom olarak yürütür.</div>
+      {% for g in gruplar %}
+      <div class="grp"><h4>{{g}}</h4><div class="caps">
+        {% for c in caps if c.grup==g %}
+        <div class="cap" data-k="{{c.key}}" onclick="toggleCap(this)">
+          <div class="ck">✓</div><div class="ik">{{c.ikon}}</div>
+          <div class="nm">{{c.ad}}</div><div class="ac">{{c.aciklama}}</div>
+        </div>{% endfor %}
+      </div></div>{% endfor %}
+      <div class="warnbox hidden" id="l2warn">⚠ ARP/Poisoning saldırıları L2 ağ erişimi ve ek yetki (NET_ADMIN) gerektirir; sandbox ortamında sınırlı çalışabilir.</div>
+      <div class="nav"><button class="sec" onclick="go(0)">← Geri</button>
+        <button class="pri" id="s1next" onclick="go(2)">Devam →</button></div>
+    </div>
+
+    <!-- Adim 3: Ayarlar -->
+    <div class="card scr hidden" id="s2">
+      <h2>3 · Tarama Ayarları</h2>
+      <div class="desc">Derinlik, bütçe ve ek talimatlar.</div>
+      <label>Tarama Modu</label>
+      <div class="modes">
+        <div class="mode" data-m="quick" onclick="pickMode(this)"><b>Hızlı</b><small>CI/CD, düşük maliyet</small></div>
+        <div class="mode sel" data-m="standard" onclick="pickMode(this)"><b>Standart</b><small>Rutin test</small></div>
+        <div class="mode" data-m="deep" onclick="pickMode(this)"><b>Derin</b><small>Kapsamlı inceleme</small></div>
+      </div>
+      <div class="row">
+        <div><label>Azami Bütçe (USD, opsiyonel)</label><input id="butce" type="number" min="0" step="0.5" placeholder="5"></div>
+        <div></div>
+      </div>
+      <label>Ek Özel Talimat (opsiyonel)</label>
+      <textarea id="talimat" rows="3" placeholder="Örn: Giriş formuna ve /admin paneline odaklan. Test kimliği: admin:admin"></textarea>
+      <div class="nav"><button class="sec" onclick="go(1)">← Geri</button>
+        <button class="pri" onclick="go(3)">Devam →</button></div>
+    </div>
+
+    <!-- Adim 4: Ozet -->
+    <div class="card scr hidden" id="s3">
+      <h2>4 · Özet & Başlat</h2>
+      <div class="desc">Seçimlerinizi kontrol edip taramayı başlatın.</div>
+      <div class="sum" id="ozet"></div>
+      <div class="nav"><button class="sec" onclick="go(2)">← Geri</button>
+        <button class="pri" id="baslatBtn" onclick="baslat()">⚡ Saldırıyı Başlat</button></div>
+    </div>
+  </div>
+
+  <!-- ================= ILERLEME ================= -->
+  <div id="pane-run" class="hidden">
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div class="stat run" id="runStat"><span class="dot"></span><span id="runStatTxt">Çalışıyor…</span></div>
+        <div class="sp" style="flex:1"></div>
+        <button class="sec mini" id="stopBtn" onclick="durdur()">■ Durdur</button>
+        <button class="sec mini" onclick="showTab('gecmis');loadRuns()">← Geçmiş</button>
+        <button class="sec mini" onclick="showTab('yeni');resetWiz()">＋ Yeni</button>
+      </div>
+      <div class="desc" id="runHead" style="margin-top:12px"></div>
+      <pre class="log" id="log">Başlatılıyor…</pre>
+      <div id="dlWrap"></div>
+    </div>
+  </div>
+
+  <!-- ================= GECMIS ================= -->
+  <div id="pane-gecmis" class="hidden">
+    <div class="card">
+      <h2>Geçmiş Taramalar</h2><div class="desc">Tamamlanan ve devam eden taramalar.</div>
+      <table><thead><tr><th>Tarih</th><th>Firma</th><th>Uygulama</th><th>Hedef</th>
+        <th>Türler</th><th>Durum</th><th>Rapor</th></tr></thead>
+        <tbody id="runsBody"><tr><td colspan="7" style="color:var(--mut)">Yükleniyor…</td></tr></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script>
+const CAPKEYS={}; document.querySelectorAll('.cap').forEach(c=>CAPKEYS[c.dataset.k]=c.querySelector('.nm').textContent);
+let step=0, mode='standard', selected=new Set(), curRun=null, poll=null;
+
+function showTab(t){
+  document.getElementById('t-yeni').classList.toggle('on',t=='yeni');
+  document.getElementById('t-gecmis').classList.toggle('on',t=='gecmis');
+  document.getElementById('pane-yeni').classList.toggle('hidden',t!='yeni');
+  document.getElementById('pane-gecmis').classList.toggle('hidden',t!='gecmis');
+  document.getElementById('pane-run').classList.add('hidden');
+  if(t=='yeni' && curRun){/*keep*/}
+}
+function go(n){
+  if(n==2 && selected.size==0){alert('En az bir saldırı türü seçin.');return;}
+  step=n;
+  document.querySelectorAll('.scr').forEach((s,i)=>s.classList.toggle('hidden',i!=n));
+  document.querySelectorAll('.step').forEach((s,i)=>s.classList.toggle('on',i<=n));
+  if(n==3)ozetle();
+}
+function toggleCap(el){el.classList.toggle('sel');
+  const k=el.dataset.k; if(el.classList.contains('sel'))selected.add(k);else selected.delete(k);
+  document.getElementById('l2warn').classList.toggle('hidden',!(selected.has('arp')||selected.has('zehirleme')));
+  document.getElementById('s1next').disabled=selected.size==0;
+}
+function pickMode(el){document.querySelectorAll('.mode').forEach(m=>m.classList.remove('sel'));
+  el.classList.add('sel');mode=el.dataset.m;}
+function val(id){return document.getElementById(id).value.trim();}
+function ozetle(){
+  const turler=[...selected].map(k=>`<span class="chip">${CAPKEYS[k]}</span>`).join('');
+  document.getElementById('ozet').innerHTML=
+    `<div>Firma</div><div>${val('firma')||'-'}</div>
+     <div>Uygulama</div><div>${val('app')||'-'}</div>
+     <div>Hedef IP</div><div>${val('ip')||'-'}</div>
+     <div>Web URL</div><div>${val('url')||'-'}</div>
+     <div>Saldırı Türleri</div><div>${turler||'-'}</div>
+     <div>Mod</div><div>${mode}</div>
+     <div>Bütçe</div><div>${val('butce')?('$'+val('butce')):'sınırsız'}</div>
+     <div>Kimlik Bilgisi</div><div>${val('kullanici')?(val('kullanici')+' / '+(val('parola')?'••••':'(parolasız)')):'-'}</div>
+     <div>Ek Talimat</div><div>${val('talimat')||'-'}</div>`;
+}
+async function baslat(){
+  if(!val('ip')&&!val('url')){alert('Hedef IP veya URL girin (Adım 1).');go(0);return;}
+  const btn=document.getElementById('baslatBtn');btn.disabled=true;btn.textContent='Başlatılıyor…';
+  const body={ip:val('ip'),url:val('url'),app:val('app'),firma:val('firma'),
+    turler:[...selected],mode:mode,butce:val('butce'),talimat:val('talimat'),
+    kullanici:val('kullanici'),parola:val('parola')};
+  const r=await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const j=await r.json();btn.disabled=false;btn.textContent='⚡ Saldırıyı Başlat';
+  if(j.error){alert('Hata: '+j.error);return;}
+  curRun=j.id; openRun(j.id,body);
+}
+function openRun(id,body){
+  document.getElementById('pane-yeni').classList.add('hidden');
+  document.getElementById('pane-gecmis').classList.add('hidden');
+  document.getElementById('pane-run').classList.remove('hidden');
+  document.getElementById('runHead').textContent=
+    `${body.firma||'-'} · ${body.app||id} · Hedef: ${body.ip||body.url} · Türler: ${[...selected].map(k=>CAPKEYS[k]).join(', ')}`;
+  document.getElementById('dlWrap').innerHTML='';
+  document.getElementById('stopBtn').style.display='';
+  setStat('run','Çalışıyor…');
+  if(poll)clearInterval(poll); pollStatus(id); poll=setInterval(()=>pollStatus(id),3000);
+}
+function openRunById(id){
+  const m=(window._rm&&window._rm[id])||{};
+  curRun=id;
+  document.getElementById('pane-yeni').classList.add('hidden');
+  document.getElementById('pane-gecmis').classList.add('hidden');
+  document.getElementById('pane-run').classList.remove('hidden');
+  const turNames=(m.turler||[]).map(k=>CAPKEYS[k]||k).join(', ');
+  document.getElementById('runHead').textContent=
+    `${m.firma||'-'} · ${m.app||id} · Hedef: ${m.hedef||'-'} · Türler: ${turNames}`;
+  document.getElementById('dlWrap').innerHTML='';
+  const fin=(m.status&&(m.status.startsWith('done')||['failed','stopped','done_nopdf'].includes(m.status)));
+  document.getElementById('stopBtn').style.display=fin?'none':'';
+  setStat(fin?(m.status&&m.status.startsWith('done')?'done':'fail'):'run', fin?'':'Çalışıyor…');
+  document.getElementById('log').textContent='Yükleniyor…';
+  if(poll)clearInterval(poll);
+  pollStatus(id);
+  if(!fin) poll=setInterval(()=>pollStatus(id),3000);
+}
+function setStat(cls,txt){const s=document.getElementById('runStat');
+  s.className='stat '+cls;document.getElementById('runStatTxt').textContent=txt;}
+async function pollStatus(id){
+  const r=await fetch('/api/status/'+id);const j=await r.json();
+  const log=document.getElementById('log');const atBottom=log.scrollHeight-log.scrollTop-log.clientHeight<40;
+  log.textContent=j.log||'(çıktı bekleniyor…)';if(atBottom)log.scrollTop=log.scrollHeight;
+  if(['done','done_warn','failed','stopped','done_nopdf'].includes(j.status)){
+    clearInterval(poll);document.getElementById('stopBtn').style.display='none';
+    if(j.status.startsWith('done')&&j.pdf){setStat('done','Tamamlandı ✓');
+      document.getElementById('dlWrap').innerHTML=`<a class="dl" href="/api/report/${id}">⬇ PDF Raporu İndir</a>`;}
+    else if(j.status=='stopped'){setStat('fail','Durduruldu');}
+    else{setStat('fail','Başarısız'+(j.error?(' — '+j.error):''));}
+  }
+}
+async function durdur(){if(curRun && confirm('Tarama durdurulsun mu?')){await fetch('/api/stop/'+curRun,{method:'POST'});}}
+function resetWiz(){selected.clear();document.querySelectorAll('.cap').forEach(c=>c.classList.remove('sel'));
+  ['firma','app','ip','url','butce','talimat','kullanici','parola'].forEach(i=>document.getElementById(i).value='');go(0);}
+async function loadRuns(){
+  const r=await fetch('/api/runs');const j=await r.json();const b=document.getElementById('runsBody');
+  if(!j.runs.length){b.innerHTML='<tr><td colspan="7" style="color:var(--mut)">Henüz tarama yok.</td></tr>';return;}
+  window._rm={};
+  b.innerHTML=j.runs.map(x=>{
+    window._rm[x.id]=x;
+    const d=x.started?new Date(x.started*1000).toLocaleString('tr-TR'):'-';
+    let bd='b-run',bt='çalışıyor';
+    if(x.status&&x.status.startsWith('done')){bd='b-done';bt='tamam';}
+    else if(['failed','stopped','done_nopdf'].includes(x.status)){bd='b-fail';bt=x.status;}
+    const rap=(x.status&&x.status.startsWith('done')&&x.pdf)?
+      `<a class="dl mini" style="margin:0;padding:5px 12px" href="/api/report/${x.id}" onclick="event.stopPropagation()">⬇ PDF</a>`:'—';
+    const tur=(x.turler||[]).map(k=>CAPKEYS[k]||k).join(', ');
+    return `<tr style="cursor:pointer" title="İzlemek/görüntülemek için tıklayın" onclick="openRunById('${x.id}')"><td>${d}</td><td>${x.firma||'-'}</td><td>${x.app||'-'}</td><td>${x.hedef||'-'}</td>
+      <td style="max-width:200px;color:var(--mut)">${tur}</td>
+      <td><span class="badge ${bd}">${bt}</span></td><td>${rap}</td></tr>`;
+  }).join('');
+}
+document.getElementById('s1next').disabled=true;
+</script></body></html>

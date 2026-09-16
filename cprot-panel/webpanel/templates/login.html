@@ -1,0 +1,33 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Strix Panel · Giriş</title>
+<style>
+:root{--bg:#0b1020;--card:#141b31;--acc:#3ba0ff;--txt:#e6ecf5;--mut:#8a97b0;--line:#26314d}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;
+background:radial-gradient(1200px 600px at 70% -10%,#1a2547,transparent),var(--bg);
+color:var(--txt);min-height:100vh;display:grid;place-items:center}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:38px 34px;
+width:340px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+.logo{font-size:30px;font-weight:800;letter-spacing:1px;text-align:center;margin-bottom:2px}
+.logo span{color:var(--acc)}
+.sub{text-align:center;color:var(--mut);font-size:12px;margin-bottom:24px}
+label{display:block;font-size:12px;color:var(--mut);margin:14px 0 6px}
+input{width:100%;padding:11px 13px;border-radius:9px;border:1px solid var(--line);
+background:#0e1526;color:var(--txt);font-size:14px;outline:none}
+input:focus{border-color:var(--acc)}
+button{width:100%;margin-top:22px;padding:12px;border:0;border-radius:9px;background:var(--acc);
+color:#03122a;font-weight:700;font-size:14px;cursor:pointer}
+button:hover{filter:brightness(1.08)}
+.err{background:#3a1420;border:1px solid #6b2233;color:#ff9db0;padding:9px 12px;border-radius:8px;
+font-size:12.5px;margin-top:16px;text-align:center}
+.foot{text-align:center;color:var(--mut);font-size:11px;margin-top:20px}
+</style></head><body>
+<form class="card" method="post">
+  <div class="logo">🦉 STR<span>IX</span></div>
+  <div class="sub">Sızma Testi Kontrol Paneli</div>
+  <label>Kullanıcı Adı</label><input name="u" autofocus autocomplete="username">
+  <label>Şifre</label><input name="p" type="password" autocomplete="current-password">
+  {% if err %}<div class="err">{{err}}</div>{% endif %}
+  <button type="submit">Giriş Yap</button>
+  <div class="foot">C-Prot Yetkilisi</div>
+</form></body></html>

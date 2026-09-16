@@ -1,0 +1,221 @@
+#!/usr/bin/env bash
+# ============================================================================
+#  saldir  —  Strix tabanlı Türkçe sızma testi CLI'ı  (C-Prot Siber Güvenlik)
+#  Örnek:
+#   saldir --ip 192.168.55.20 --app webuygulamasi --firma "ACME A.Ş." \
+#          --saldiriturleri web,port,zafiyet,kimlik
+# ============================================================================
+set -euo pipefail
+
+STRIX_BIN="${STRIX_BIN:-/usr/local/bin/strix}"
+ENV_FILE="/etc/pentest/strix.env"
+RAPOR_PY="/opt/pentest/lib/strix_rapor.py"
+BASE_OUT="/root/pentests"
+
+RED=$'\033[0;31m'; GRN=$'\033[0;32m'; YEL=$'\033[1;33m'; CYN=$'\033[0;36m'; NC=$'\033[0m'; BLD=$'\033[1m'
+
+# ---- Saldırı türü -> Strix talimat eşleştirmesi -----------------------------
+declare -A TUR_ACIKLAMA=(
+  [ip]="Ağ/host keşfi"
+  [port]="Port taraması"
+  [web]="Web uygulama güvenliği (OWASP Top 10)"
+  [zafiyet]="Zafiyet/CVE taraması"
+  [kimlik]="Kimlik doğrulama ve parola testi"
+  [api]="API güvenlik testi"
+  [ssl]="SSL/TLS yapılandırma testi"
+  [dizin]="Dizin/içerik keşfi"
+  [arp]="ARP spoofing / MITM (L2)"
+  [zehirleme]="Poisoning (ARP/DNS/LLMNR/NBT-NS)"
+  [dos]="Servis dayanıklılık gözlemi (yıkıcı DEĞİL)"
+  [hepsi]="Tüm saldırı türleri"
+)
+tur_talimat() {
+  case "$1" in
+    ip)        echo "- Ağ ve host keşfi: canlı hostları, açık servisleri, işletim sistemi ve sürüm parmak izlerini belirle." ;;
+    port)      echo "- Port taraması: TCP/UDP açık portları, çalışan servisleri ve sürümlerini (nmap benzeri) tespit et." ;;
+    web)       echo "- Web uygulama güvenlik testi: OWASP Top 10 (SQL injection, XSS, IDOR, SSRF, kimlik doğrulama atlatma, güvensiz deserializasyon, güvenlik yanlış yapılandırması, dosya yükleme, komut enjeksiyonu) testleri yap." ;;
+    zafiyet)   echo "- Zafiyet değerlendirmesi: keşfedilen servis ve yazılım sürümlerindeki bilinen zafiyetleri/CVE'leri tespit et ve mümkünse doğrula." ;;
+    kimlik)    echo "- Kimlik doğrulama ve parola testi: varsayılan/zayıf parolalar, oturum yönetimi kusurları, JWT sorunları, yetkilendirme/erişim kontrolü (yatay-dikey yetki yükseltme) zafiyetlerini test et." ;;
+    api)       echo "- API güvenlik testi: REST/GraphQL uç noktalarında yetkilendirme, aşırı veri ifşası, hız sınırı, kütle atama (mass assignment) zafiyetlerini test et." ;;
+    ssl)       echo "- SSL/TLS testi: zayıf şifreleme paketleri, sürüm sorunları (SSLv3/TLS1.0), sertifika ve yapılandırma hatalarını değerlendir." ;;
+    dizin)     echo "- Dizin/içerik keşfi: gizli dizinleri, yedek dosyaları, yönetim panellerini ve hassas dosyaları keşfet." ;;
+    arp)       echo "- ARP spoofing / MITM: yerel ağ segmentinde ARP zehirleme ile ortadaki adam (MITM) senaryosunu değerlendir. (L2 erişimi ve NET_ADMIN gerektirir.)" ;;
+    zehirleme) echo "- Poisoning saldırıları: ARP/DNS/LLMNR/NBT-NS zehirleme (Responder tarzı) ile kimlik bilgisi yakalama olasılığını değerlendir. (L2 erişimi gerektirir.)" ;;
+    dos)       echo "- Servis dayanıklılık GÖZLEMİ: yalnızca gözlemsel; hedefi çökertecek/yük bindirecek yıkıcı DoS testleri YAPMA." ;;
+    *)         echo "- ${1}: bu kategori için genel güvenlik değerlendirmesi yap." ;;
+  esac
+}
+
+usage() {
+  cat <<USAGE
+${BLD}saldir${NC} — Strix tabanlı Türkçe sızma testi aracı
+
+${BLD}Kullanım:${NC}
+  saldir --ip <ip> [--url <url>] --app <isim> --firma <firma> \\
+         --saldiriturleri <tür1,tür2,...> [seçenekler]
+
+${BLD}Zorunlu:${NC}
+  --saldiriturleri LISTE   Virgülle ayrılmış saldırı türleri
+  (ve en az bir hedef: --ip veya --url)
+
+${BLD}Hedef:${NC}
+  --ip IP/HOST             Hedef IP veya host adı
+  --url URL                Web uygulama adresi (http/https)
+  --app ISIM               Uygulama/proje adı (rapor başlığı)
+  --firma ISIM             Müşteri/firma adı (rapor için)
+
+${BLD}Saldırı türleri:${NC}
+  ip, port, web, zafiyet, kimlik, api, ssl, dizin, arp, zehirleme, dos, hepsi
+
+${BLD}Seçenekler:${NC}
+  --mod quick|standard|deep   Tarama derinliği (varsayılan: standard)
+  --butce USD                 Azami LLM maliyeti (örn. --butce 5)
+  --talimat "METİN"           Ek özel talimat
+  --kullanici KULLANICI       Kimlik doğrulamalı test için kullanıcı adı
+  --parola PAROLA             Kimlik doğrulamalı test için parola
+  --kimlik "kullanici:parola" Kimlik çifti (tekrarlanabilir)
+  --onizle                    Komutu çalıştırmadan sadece göster (dry-run)
+  --no-pdf                    PDF üretme
+  -h, --help                  Bu yardım
+
+${BLD}Örnek:${NC}
+  saldir --ip 192.168.55.20 --app webuygulamasi --firma "ACME A.Ş." \\
+         --saldiriturleri web,port,zafiyet,kimlik --mod deep --butce 8
+USAGE
+}
+
+# ---- Argüman ayrıştırma -----------------------------------------------------
+IP=""; URL=""; APP=""; FIRMA=""; TURLER=""; MOD="standard"; BUTCE=""; EKTALIMAT=""
+KULLANICI=""; PAROLA=""; KIMLIKLER=()
+ONIZLE=0; YAP_PDF=1
+[[ $# -eq 0 ]] && { usage; exit 1; }
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --ip) IP="$2"; shift 2;;
+    --url) URL="$2"; shift 2;;
+    --app) APP="$2"; shift 2;;
+    --firma) FIRMA="$2"; shift 2;;
+    --saldiriturleri|--turler) TURLER="$2"; shift 2;;
+    --mod) MOD="$2"; shift 2;;
+    --butce) BUTCE="$2"; shift 2;;
+    --talimat) EKTALIMAT="$2"; shift 2;;
+    --kullanici|--kullanıcı) KULLANICI="$2"; shift 2;;
+    --parola|--sifre|--şifre) PAROLA="$2"; shift 2;;
+    --kimlik) KIMLIKLER+=("$2"); shift 2;;
+    --onizle) ONIZLE=1; shift;;
+    --no-pdf) YAP_PDF=0; shift;;
+    -h|--help) usage; exit 0;;
+    *) echo "${RED}Bilinmeyen seçenek: $1${NC}"; usage; exit 1;;
+  esac
+done
+
+# ---- Doğrulama --------------------------------------------------------------
+[[ -z "$TURLER" ]] && { echo "${RED}Hata: --saldiriturleri zorunlu.${NC}"; exit 1; }
+if [[ -z "$IP" && -z "$URL" ]]; then
+  echo "${RED}Hata: en az bir hedef gerekli (--ip veya --url).${NC}"; exit 1
+fi
+[[ -z "$APP" ]] && APP="${IP:-$URL}"
+[[ -z "$FIRMA" ]] && FIRMA="Belirtilmedi"
+
+# LLM yapılandırması
+if [[ -f "$ENV_FILE" ]]; then set -a; . "$ENV_FILE"; set +a; fi
+if [[ -z "${LLM_API_KEY:-}" || -z "${STRIX_LLM:-}" ]]; then
+  echo "${RED}Hata:${NC} LLM yapılandırması yok. ${YEL}$ENV_FILE${NC} içine STRIX_LLM ve LLM_API_KEY girin."
+  echo "Örnek:"
+  echo "  STRIX_LLM='anthropic/claude-sonnet-4-6'"
+  echo "  LLM_API_KEY='sk-ant-...'"
+  exit 1
+fi
+
+# ---- Türleri işle -----------------------------------------------------------
+IFS=',' read -ra TUR_ARR <<< "$TURLER"
+if printf '%s\n' "${TUR_ARR[@]}" | grep -qiw "hepsi"; then
+  TUR_ARR=(ip port web zafiyet kimlik api ssl dizin)
+fi
+TALIMAT_GOVDE=""
+GECERLI_TURLER=""
+L2_UYARI=0
+for t in "${TUR_ARR[@]}"; do
+  t="$(echo "$t" | tr '[:upper:]' '[:lower:]' | xargs)"
+  [[ -z "$t" ]] && continue
+  TALIMAT_GOVDE+="$(tur_talimat "$t")"$'\n'
+  GECERLI_TURLER+="${t},"
+  [[ "$t" == "arp" || "$t" == "zehirleme" ]] && L2_UYARI=1
+done
+GECERLI_TURLER="${GECERLI_TURLER%,}"
+
+# ---- Strix talimatını oluştur ----------------------------------------------
+HEDEF_METIN="${IP:+$IP }${URL:+$URL}"
+INSTRUCTION="Bu, müşterinin yazılı izniyle yürütülen YETKİLİ bir sızma testidir. Hedef: ${HEDEF_METIN}. Uygulama: ${APP}. Müşteri tarafından talep edilen test kapsamı:
+${TALIMAT_GOVDE}
+Her doğrulanmış bulgu için önem derecesini (CVSS), etkiyi, yeniden üretim adımlarını/kanıtı ve somut çözüm önerisini raporla. Kapsam dışına çıkma; yalnızca listelenen hedefleri test et."
+[[ -n "$EKTALIMAT" ]] && INSTRUCTION+=$'\n'"Ek talimat: $EKTALIMAT"
+# ---- Kimlik dogrulamali saldiri bilgileri ----
+[[ -n "$KULLANICI" ]] && KIMLIKLER+=("${KULLANICI}:${PAROLA}")
+if [[ ${#KIMLIKLER[@]} -gt 0 ]]; then
+  KIMLIK_METIN=""
+  for k in "${KIMLIKLER[@]}"; do KIMLIK_METIN+="$k, "; done
+  KIMLIK_METIN="${KIMLIK_METIN%, }"
+  INSTRUCTION+=$'\n'"KIMLIK DOĞRULAMALI TEST: Aşağıdaki kullanıcı:parola bilgilerini kullanarak hedefe giriş yap ve oturum açmış (authenticated) halde testleri gerçekleştir. Farklı kimlik doğrulama yöntemlerini dene (web giriş formu, HTTP Basic Auth, API token/anahtar, SSH). Kimlik bilgileri: ${KIMLIK_METIN}"
+fi
+# ---- Rapor dili: TURKCE zorunlu ----
+INSTRUCTION+=$'\n'"ÇOK ÖNEMLİ — RAPOR DİLİ: Nihai raporu (penetration_test_report.md) ve tüm bulguları, başlıkları, açıklamaları, kanıtları, önem derecelerini ve çözüm önerilerini TAMAMEN TÜRKÇE yaz. Yaygın teknik terimler (SQL injection, XSS vb.) dışında İngilizce kullanma."
+
+# ---- Hedef argümanları ------------------------------------------------------
+STRIX_ARGS=()
+[[ -n "$IP" ]] && STRIX_ARGS+=(-t "$IP")
+[[ -n "$URL" ]] && STRIX_ARGS+=(-t "$URL")
+STRIX_ARGS+=(--instruction "$INSTRUCTION" -n -m "$MOD")
+[[ -n "$BUTCE" ]] && STRIX_ARGS+=(--max-budget "$BUTCE")
+
+# ---- Çıktı dizini -----------------------------------------------------------
+TS="$(date +%Y%m%d-%H%M%S)"
+SAFE_FIRMA="$(echo "$FIRMA" | tr ' /' '__' | tr -cd '[:alnum:]_.-')"
+SAFE_APP="$(echo "$APP" | tr ' /' '__' | tr -cd '[:alnum:]_.-')"
+RUN_ROOT="${BASE_OUT}/${SAFE_FIRMA}/${TS}-${SAFE_APP}"
+mkdir -p "$RUN_ROOT"
+
+echo "${CYN}${BLD}"
+echo "  ┌─ SALDIR / Strix Sızma Testi ──────────────────────────────"
+echo "  │ Firma   : $FIRMA"
+echo "  │ Uygulama: $APP"
+echo "  │ Hedef   : ${HEDEF_METIN}"
+echo "  │ Türler  : $GECERLI_TURLER"
+echo "  │ Mod     : $MOD    Model: ${STRIX_LLM}"
+echo "  │ Çıktı   : $RUN_ROOT"
+echo "  └────────────────────────────────────────────────────────────"
+echo "${NC}"
+[[ ${#KIMLIKLER[@]} -gt 0 ]] && echo "${CYN}  🔑 Kimlik doğrulamalı test: ${#KIMLIKLER[@]} kimlik çifti verildi.${NC}"
+[[ $L2_UYARI -eq 1 ]] && echo "${YEL}  ⚠ arp/zehirleme L2 ağ erişimi ve ek yetki (NET_ADMIN/host ağı) gerektirir; sandbox'ta sınırlı olabilir.${NC}"
+
+if [[ $ONIZLE -eq 1 ]]; then
+  echo "${YEL}[önizleme] Çalıştırılacak komut:${NC}"
+  printf '  cd %q && %q' "$RUN_ROOT" "$STRIX_BIN"; printf ' %q' "${STRIX_ARGS[@]}"; echo
+  exit 0
+fi
+
+# ---- Strix'i çalıştır -------------------------------------------------------
+cd "$RUN_ROOT"
+echo "${GRN}[*] Strix başlatılıyor...${NC}"
+set +e
+"$STRIX_BIN" "${STRIX_ARGS[@]}" 2>&1 | tee "$RUN_ROOT/strix_konsol.log"
+STRIX_RC=${PIPESTATUS[0]}
+set -e
+echo "${GRN}[*] Strix tamamlandı (çıkış kodu: $STRIX_RC).${NC}"
+
+# En son run dizinini bul
+RUN_DIR="$(ls -1dt "$RUN_ROOT"/strix_runs/*/ 2>/dev/null | head -1 || true)"
+[[ -z "$RUN_DIR" ]] && RUN_DIR="$RUN_ROOT"
+
+# ---- PDF üret ---------------------------------------------------------------
+if [[ $YAP_PDF -eq 1 ]]; then
+  PDF_OUT="${RUN_ROOT}/Rapor_${SAFE_FIRMA}_${SAFE_APP}_${TS}.pdf"
+  echo "${GRN}[*] PDF rapor oluşturuluyor...${NC}"
+  if python3 "$RAPOR_PY" --run-dir "$RUN_DIR" --firma "$FIRMA" --uygulama "$APP" \
+       --hedef "$HEDEF_METIN" --turler "$GECERLI_TURLER" --out "$PDF_OUT"; then
+    echo "${GRN}${BLD}[✓] Rapor hazır: ${NC}${PDF_OUT}"
+  else
+    echo "${RED}[!] PDF üretimi başarısız. Ham çıktı: $RUN_DIR${NC}"
+  fi
+fi
+echo "${CYN}[i] Detaylı görünüm: strix view  (dizin: $RUN_DIR)${NC}"
