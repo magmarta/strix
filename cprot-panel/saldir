@@ -156,7 +156,7 @@ if [[ ${#KIMLIKLER[@]} -gt 0 ]]; then
   KIMLIK_METIN=""
   for k in "${KIMLIKLER[@]}"; do KIMLIK_METIN+="$k, "; done
   KIMLIK_METIN="${KIMLIK_METIN%, }"
-  INSTRUCTION+=$'\n'"KIMLIK DOĞRULAMALI TEST: Aşağıdaki kullanıcı:parola bilgilerini kullanarak hedefe giriş yap ve oturum açmış (authenticated) halde testleri gerçekleştir. Farklı kimlik doğrulama yöntemlerini dene (web giriş formu, HTTP Basic Auth, API token/anahtar, SSH). Kimlik bilgileri: ${KIMLIK_METIN}"
+  INSTRUCTION+=$'\n'"KIMLIK DOĞRULAMALI TEST (ÖNEMLİ): 1) Hedefteki giriş/oturum açma formunu veya kimlik doğrulama uç noktasını tespit et. 2) Aşağıdaki kullanıcı:parola bilgileriyle GİRİŞ YAP; gerekirse farklı yöntemleri dene (web giriş formu, HTTP Basic Auth, API token/anahtar, SSH). 3) Giriş başarılı olduğunda oturumu (çerez/token) KORU. 4) Oturum açmış (authenticated) haldeyken giriş SONRASI erişilebilen TÜM sayfaları, panelleri, menüleri ve API uçlarını keşfedip tara; yetki yükseltme, IDOR/BOLA, iş mantığı ve yalnızca oturum açınca görünen zafiyetleri test et. Kimlik bilgileri: ${KIMLIK_METIN}"
 fi
 # ---- Rapor dili: TURKCE zorunlu ----
 INSTRUCTION+=$'\n'"ÇOK ÖNEMLİ — RAPOR DİLİ: Nihai raporu (penetration_test_report.md) ve tüm bulguları, başlıkları, açıklamaları, kanıtları, önem derecelerini ve çözüm önerilerini TAMAMEN TÜRKÇE yaz. Yaygın teknik terimler (SQL injection, XSS vb.) dışında İngilizce kullanma."
