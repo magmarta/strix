@@ -27,6 +27,10 @@ if ! command -v sherlock >/dev/null 2>&1; then
     apt-get install -y -qq pipx >/dev/null 2>&1 && pipx install sherlock-project >/dev/null 2>&1 || true
   }
 fi
+# Semgrep (kod analizi / SAST) — yerel calisir, kaynak kod disari cikmaz
+if ! command -v semgrep >/dev/null 2>&1; then
+  apt-get install -y -qq pipx >/dev/null 2>&1 && pipx install semgrep >/dev/null 2>&1 || pip3 install --quiet --break-system-packages semgrep >/dev/null 2>&1 || true
+fi
 
 echo "[4/6] Panel + CLI dosyalari..."
 mkdir -p /opt/pentest/lib /opt/pentest/webpanel/templates /etc/pentest /root/pentests

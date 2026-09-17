@@ -60,6 +60,23 @@ def load_sarif(run_dir):
                 findings.append(dict(title=str(title), sev=sev, cvss=cvss))
     return findings
 
+SEMGREP_SEV={"ERROR":"high","WARNING":"medium","INFO":"low"}
+def load_semgrep(path):
+    try: d=json.load(open(path,encoding="utf-8"))
+    except Exception: return []
+    out=[]
+    for r in d.get("results",[]):
+        extra=r.get("extra",{}) or {}; meta=extra.get("metadata",{}) or {}
+        sev=SEMGREP_SEV.get(str(extra.get("severity","WARNING")).upper(),"medium")
+        rid=r.get("check_id","") or ""
+        title=rid.split(".")[-1].replace("-"," ") if rid else "Kod bulgusu"
+        loc=f"{r.get('path','')}:{r.get('start',{}).get('line','')}"
+        cwe=meta.get("cwe"); owasp=meta.get("owasp"); tag=""
+        if cwe: tag+="CWE: "+(", ".join(cwe) if isinstance(cwe,list) else str(cwe))
+        if owasp: tag+=("  " if tag else "")+"OWASP: "+(", ".join(owasp) if isinstance(owasp,list) else str(owasp))
+        out.append(dict(title=title,sev=sev,loc=loc,desc=extra.get("message","") or "",tag=tag,rule=rid))
+    out.sort(key=lambda f: SEV_ORDER.get(f["sev"],9)); return out
+
 def find_report_md(run_dir):
     cands=[]
     for mf in glob.glob(os.path.join(run_dir,"**","*.md"), recursive=True):
@@ -206,6 +223,21 @@ def build(args):
             E+=[PageBreak(),Paragraph("OSINT — Kullanıcı Adı Keşfi",S["h1"]),HRFlowable(width="100%",color=NAVY),Spacer(1,3*mm)]
             E+=md_to_flowables(_ot,S)
 
+    sast=load_semgrep(args.sast_json) if getattr(args,"sast_json","") and os.path.exists(args.sast_json) else []
+    if sast:
+        E+=[PageBreak(),Paragraph("Kod Analizi (SAST — Semgrep)",S["h1"]),HRFlowable(width="100%",color=NAVY),Spacer(1,3*mm)]
+        cnt={}
+        for _f in sast: cnt[_f["sev"]]=cnt.get(_f["sev"],0)+1
+        _oz=", ".join(f"{SEV_TR[k]}: {cnt[k]}" for k in ["critical","high","medium","low","info"] if cnt.get(k))
+        E+=[Paragraph(f"Toplam <b>{len(sast)}</b> statik kod bulgusu ({_oz}). Analiz yerelde yapıldı; kaynak kod dışarı gönderilmedi.",S["body"]),Spacer(1,4*mm)]
+        for i,_f in enumerate(sast,1):
+            _cs=ParagraphStyle(f"sc{i}",parent=S["body"],textColor=SEV_COLOR.get(_f["sev"],colors.grey),fontName=FONT_B)
+            E+=[Paragraph(f"{i}. {_f['title']}  [{SEV_TR.get(_f['sev'],'')}]",_cs)]
+            if _f.get("loc"): E+=[P("Konum: "+_f["loc"],S["small"])]
+            if _f.get("tag"): E+=[P(_f["tag"],S["small"])]
+            if _f.get("desc"): E+=[P(_f["desc"],S["body"])]
+            E+=[Spacer(1,3*mm)]
+
     def footer(canvas,d):
         canvas.saveState(); canvas.setFont(FONT,7.5); canvas.setFillColor(colors.grey)
         canvas.drawString(18*mm,10*mm,f"C-Prot Siber Güvenlik · Sızma Testi Raporu · {args.firma or ''}")
@@ -219,4 +251,5 @@ if __name__=="__main__":
     ap.add_argument("--uygulama",default=""); ap.add_argument("--hedef",default="")
     ap.add_argument("--turler",default=""); ap.add_argument("--out",required=True)
     ap.add_argument("--osint-md",dest="osint_md",default="")
+    ap.add_argument("--sast-json",dest="sast_json",default="")
     build(ap.parse_args())

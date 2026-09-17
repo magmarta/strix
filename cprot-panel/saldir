@@ -28,6 +28,7 @@ declare -A TUR_ACIKLAMA=(
   [zehirleme]="Poisoning (ARP/DNS/LLMNR/NBT-NS)"
   [dos]="Servis dayanıklılık gözlemi (yıkıcı DEĞİL)"
   [osint]="Kullanıcı adı OSINT / hesap keşfi (Sherlock)"
+  [kod]="Kod analizi / SAST (Semgrep — yerel)"
   [hepsi]="Tüm saldırı türleri"
 )
 tur_talimat() {
@@ -44,6 +45,7 @@ tur_talimat() {
     zehirleme) echo "- Poisoning saldırıları: ARP/DNS/LLMNR/NBT-NS zehirleme (Responder tarzı) ile kimlik bilgisi yakalama olasılığını değerlendir. (L2 erişimi gerektirir.)" ;;
     dos)       echo "- Servis dayanıklılık GÖZLEMİ: yalnızca gözlemsel; hedefi çökertecek/yük bindirecek yıkıcı DoS testleri YAPMA." ;;
     osint)     echo "- OSINT: kullanıcı adı hesap keşfi (Sherlock ile ayrıca yürütülür)." ;;
+    kod)       echo "- Kod analizi: statik kod güvenlik analizi (Semgrep ile ayrıca yürütülür)." ;;
     *)         echo "- ${1}: bu kategori için genel güvenlik değerlendirmesi yap." ;;
   esac
 }
@@ -67,7 +69,7 @@ ${BLD}Hedef:${NC}
   --firma ISIM             Müşteri/firma adı (rapor için)
 
 ${BLD}Saldırı türleri:${NC}
-  ip, port, web, zafiyet, kimlik, api, ssl, dizin, arp, zehirleme, dos, osint, hepsi
+  ip, port, web, zafiyet, kimlik, api, ssl, dizin, arp, zehirleme, dos, osint, kod, hepsi
 
 ${BLD}Seçenekler:${NC}
   --mod quick|standard|deep   Tarama derinliği (varsayılan: standard)
@@ -77,6 +79,7 @@ ${BLD}Seçenekler:${NC}
   --parola PAROLA             Kimlik doğrulamalı test için parola
   --kimlik "kullanici:parola" Kimlik çifti (tekrarlanabilir)
   --kullaniciadi KULLANICI    OSINT hedef kullanıcı adı (Sherlock ile hesap keşfi)
+  --kod YOL|REPO_URL          Kod analizi hedefi (dizin yolu veya git repo URL — Semgrep, yerel)
   --onizle                    Komutu çalıştırmadan sadece göster (dry-run)
   --no-pdf                    PDF üretme
   -h, --help                  Bu yardım
@@ -89,7 +92,7 @@ USAGE
 
 # ---- Argüman ayrıştırma -----------------------------------------------------
 IP=""; URL=""; APP=""; FIRMA=""; TURLER=""; MOD="standard"; BUTCE=""; EKTALIMAT=""
-KULLANICI=""; PAROLA=""; KIMLIKLER=(); KULLANICIADI=""; OSINT_ISTE=0
+KULLANICI=""; PAROLA=""; KIMLIKLER=(); KULLANICIADI=""; OSINT_ISTE=0; KOD=""; SAST_ISTE=0
 ONIZLE=0; YAP_PDF=1
 [[ $# -eq 0 ]] && { usage; exit 1; }
 while [[ $# -gt 0 ]]; do
@@ -106,6 +109,7 @@ while [[ $# -gt 0 ]]; do
     --parola|--sifre|--şifre) PAROLA="$2"; shift 2;;
     --kimlik) KIMLIKLER+=("$2"); shift 2;;
     --kullaniciadi|--osint) KULLANICIADI="$2"; shift 2;;
+    --kod|--sast) KOD="$2"; shift 2;;
     --onizle) ONIZLE=1; shift;;
     --no-pdf) YAP_PDF=0; shift;;
     -h|--help) usage; exit 0;;
@@ -115,8 +119,8 @@ done
 
 # ---- Doğrulama --------------------------------------------------------------
 [[ -z "$TURLER" ]] && { echo "${RED}Hata: --saldiriturleri zorunlu.${NC}"; exit 1; }
-if [[ -z "$IP" && -z "$URL" && -z "$KULLANICIADI" ]]; then
-  echo "${RED}Hata: en az bir hedef gerekli (--ip, --url veya --kullaniciadi).${NC}"; exit 1
+if [[ -z "$IP" && -z "$URL" && -z "$KULLANICIADI" && -z "$KOD" ]]; then
+  echo "${RED}Hata: en az bir hedef gerekli (--ip, --url, --kullaniciadi veya --kod).${NC}"; exit 1
 fi
 [[ -z "$APP" ]] && APP="${IP:-$URL}"
 [[ -z "$FIRMA" ]] && FIRMA="Belirtilmedi"
@@ -144,15 +148,18 @@ for t in "${TUR_ARR[@]}"; do
   [[ -z "$t" ]] && continue
   GECERLI_TURLER+="${t},"
   if [[ "$t" == "osint" ]]; then OSINT_ISTE=1; continue; fi
+  if [[ "$t" == "kod" ]]; then SAST_ISTE=1; continue; fi
   TALIMAT_GOVDE+="$(tur_talimat "$t")"$'\n'
   [[ "$t" == "arp" || "$t" == "zehirleme" ]] && L2_UYARI=1
 done
 [[ -n "$KULLANICIADI" ]] && OSINT_ISTE=1
+[[ -n "$KOD" ]] && SAST_ISTE=1
 GECERLI_TURLER="${GECERLI_TURLER%,}"
 
 # ---- Strix talimatını oluştur ----------------------------------------------
 HEDEF_METIN="${IP:+$IP }${URL:+$URL}"
 [[ -z "${HEDEF_METIN// }" && -n "$KULLANICIADI" ]] && HEDEF_METIN="kullanıcı adı: $KULLANICIADI"
+[[ -z "${HEDEF_METIN// }" && -n "$KOD" ]] && HEDEF_METIN="kod: $KOD"
 INSTRUCTION="Bu, müşterinin yazılı izniyle yürütülen YETKİLİ bir sızma testidir. Hedef: ${HEDEF_METIN}. Uygulama: ${APP}. Müşteri tarafından talep edilen test kapsamı:
 ${TALIMAT_GOVDE}
 Her doğrulanmış bulgu için önem derecesini (CVSS), etkiyi, yeniden üretim adımlarını/kanıtı ve somut çözüm önerisini raporla. Kapsam dışına çıkma; yalnızca listelenen hedefleri test et."
@@ -194,6 +201,7 @@ echo "  └───────────────────────
 echo "${NC}"
 [[ ${#KIMLIKLER[@]} -gt 0 ]] && echo "${CYN}  🔑 Kimlik doğrulamalı test: ${#KIMLIKLER[@]} kimlik çifti verildi.${NC}"
 [[ $OSINT_ISTE -eq 1 && -n "$KULLANICIADI" ]] && echo "${CYN}  🕵️  OSINT hedef kullanıcı adı: ${KULLANICIADI}${NC}"
+[[ $SAST_ISTE -eq 1 && -n "$KOD" ]] && echo "${CYN}  🔬 Kod analizi (Semgrep, yerel) hedefi: ${KOD}${NC}"
 [[ $L2_UYARI -eq 1 ]] && echo "${YEL}  ⚠ arp/zehirleme L2 ağ erişimi ve ek yetki (NET_ADMIN/host ağı) gerektirir; sandbox'ta sınırlı olabilir.${NC}"
 
 if [[ $ONIZLE -eq 1 ]]; then
@@ -231,6 +239,25 @@ if [[ $OSINT_ISTE -eq 1 && -n "$KULLANICIADI" ]]; then
   echo "${GRN}[*] OSINT tamamlandı.${NC}"
 fi
 
+# ---- Kod Analizi (SAST / Semgrep) — yerel, kod dışarı çıkmaz ---------------
+SAST_JSON=""
+if [[ $SAST_ISTE -eq 1 && -n "$KOD" ]]; then
+  KOD_HEDEF="$KOD"
+  if [[ "$KOD" =~ ^https?:// || "$KOD" =~ ^git@ ]]; then
+    KOD_HEDEF="$RUN_ROOT/kod_hedef"
+    echo "${GRN}[*] Kod deposu klonlanıyor: ${KOD}${NC}"
+    git clone --depth 1 "$KOD" "$KOD_HEDEF" >/dev/null 2>&1 || echo "${RED}[!] Klonlama başarısız.${NC}"
+  fi
+  if [[ -e "$KOD_HEDEF" ]] && command -v semgrep >/dev/null 2>&1; then
+    SAST_JSON="$RUN_ROOT/semgrep.json"
+    echo "${GRN}[*] Semgrep (SAST) çalıştırılıyor: ${KOD_HEDEF}  — yerel analiz, kod dışarı çıkmaz.${NC}"
+    semgrep scan --config auto --metrics=off --json --output "$SAST_JSON" "$KOD_HEDEF" >/dev/null 2>&1 || true
+    echo "${GRN}[*] Kod analizi tamamlandı.${NC}"
+  else
+    echo "${YEL}[i] Semgrep kurulu değil veya kod hedefi yok; SAST atlandı.${NC}"
+  fi
+fi
+
 # ---- Strix'i çalıştır (hedef IP/URL varsa) ---------------------------------
 RUN_DIR="$RUN_ROOT"
 if [[ -n "$IP" || -n "$URL" ]]; then
@@ -253,6 +280,7 @@ if [[ $YAP_PDF -eq 1 ]]; then
   echo "${GRN}[*] PDF rapor oluşturuluyor...${NC}"
   RAPOR_EK=()
   [[ -n "$OSINT_MD" && -f "$OSINT_MD" ]] && RAPOR_EK+=(--osint-md "$OSINT_MD")
+  [[ -n "$SAST_JSON" && -f "$SAST_JSON" ]] && RAPOR_EK+=(--sast-json "$SAST_JSON")
   if python3 "$RAPOR_PY" --run-dir "$RUN_DIR" --firma "$FIRMA" --uygulama "$APP" \
        --hedef "$HEDEF_METIN" --turler "$GECERLI_TURLER" --out "$PDF_OUT" "${RAPOR_EK[@]}"; then
     echo "${GRN}${BLD}[✓] Rapor hazır: ${NC}${PDF_OUT}"

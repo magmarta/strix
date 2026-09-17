@@ -35,6 +35,8 @@ CAPS = [
    "aciklama":"Gizli dizinler, yedek dosyalar, yönetim panelleri, hassas dosyalar."},
   {"key":"osint","ad":"OSINT — Kullanıcı Adı Keşfi","ikon":"🕵️","grup":"Keşif",
    "aciklama":"Sherlock ile bir kullanıcı adının sosyal medya/çevrimiçi hesaplarını tespit et. Aşağıdaki 'Hedef Kullanıcı Adı' alanını doldurun."},
+  {"key":"kod","ad":"Kod Analizi (SAST)","ikon":"🔬","grup":"Kod",
+   "aciklama":"Semgrep ile statik kod güvenlik analizi (çok dilli). Tamamen yerel çalışır, kaynak kod dışarı çıkmaz. Aşağıdaki 'Kod Hedefi' alanını doldurun."},
   {"key":"web","ad":"Web Uygulama Güvenliği","ikon":"🕸️","grup":"Uygulama",
    "aciklama":"OWASP Top 10: SQLi, XSS, IDOR, SSRF, CSRF, komut enjeksiyonu, dosya yükleme, XXE, SSTI."},
   {"key":"api","ad":"API Güvenliği","ikon":"🔗","grup":"Uygulama",
@@ -52,7 +54,7 @@ CAPS = [
   {"key":"dos","ad":"Dayanıklılık Gözlemi","ikon":"📉","grup":"Ağ (L2)",
    "aciklama":"Yalnızca gözlemsel; yıkıcı DoS YAPILMAZ."},
 ]
-GRUPLAR = ["Keşif","Uygulama","Zafiyet","Ağ (L2)"]
+GRUPLAR = ["Keşif","Uygulama","Zafiyet","Kod","Ağ (L2)"]
 
 # ---- yardimcilar ----
 def login_required(f):
@@ -105,7 +107,7 @@ def api_start():
     d = request.get_json(force=True)
     turler = [t for t in d.get("turler",[]) if t]
     if not turler: return jsonify(error="En az bir saldırı türü seçin"), 400
-    if not (d.get("ip") or d.get("url") or d.get("kullaniciadi")): return jsonify(error="Hedef gerekli (ip, url veya kullanıcı adı)"), 400
+    if not (d.get("ip") or d.get("url") or d.get("kullaniciadi") or d.get("kod")): return jsonify(error="Hedef gerekli (ip, url, kullanıcı adı veya kod)"), 400
     rid = time.strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(2)
     rd = os.path.join(BASE, rid); os.makedirs(rd, exist_ok=True)
     params = {"ip":d.get("ip","").strip(), "url":d.get("url","").strip(),
@@ -114,7 +116,8 @@ def api_start():
               "butce":d.get("butce","").strip(), "talimat":d.get("talimat","").strip(),
               "kullanici":d.get("kullanici","").strip(), "parola":d.get("parola","").strip(),
               "kimlikler":[str(x).strip() for x in (d.get("kimlikler") or []) if str(x).strip()],
-              "kullaniciadi":d.get("kullaniciadi","").strip()}
+              "kullaniciadi":d.get("kullaniciadi","").strip(),
+              "kod":d.get("kod","").strip()}
     json.dump(params, open(os.path.join(rd,"params.json"),"w"), ensure_ascii=False, indent=2)
     json.dump({"status":"starting"}, open(os.path.join(rd,"status.json"),"w"))
     # arka planda, SSH/panelden bagimsiz calissin
