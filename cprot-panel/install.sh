@@ -17,10 +17,16 @@ if ! command -v strix >/dev/null 2>&1 && [ ! -x "$HOME/.strix/bin/strix" ]; then
 fi
 ln -sf "$HOME/.strix/bin/strix" /usr/local/bin/strix
 
-echo "[3/6] Python + font bagimliliklari..."
+echo "[3/6] Python + font bagimliliklari + Sherlock (OSINT)..."
 apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
   python3-flask python3-reportlab python3-markdown fonts-dejavu-core poppler-utils >/dev/null
+# Sherlock (kullanici adi OSINT) — Debian 13 paketi, yoksa pipx
+if ! command -v sherlock >/dev/null 2>&1; then
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq sherlock >/dev/null 2>&1 || {
+    apt-get install -y -qq pipx >/dev/null 2>&1 && pipx install sherlock-project >/dev/null 2>&1 || true
+  }
+fi
 
 echo "[4/6] Panel + CLI dosyalari..."
 mkdir -p /opt/pentest/lib /opt/pentest/webpanel/templates /etc/pentest /root/pentests

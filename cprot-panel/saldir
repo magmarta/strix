@@ -27,6 +27,7 @@ declare -A TUR_ACIKLAMA=(
   [arp]="ARP spoofing / MITM (L2)"
   [zehirleme]="Poisoning (ARP/DNS/LLMNR/NBT-NS)"
   [dos]="Servis dayanıklılık gözlemi (yıkıcı DEĞİL)"
+  [osint]="Kullanıcı adı OSINT / hesap keşfi (Sherlock)"
   [hepsi]="Tüm saldırı türleri"
 )
 tur_talimat() {
@@ -42,6 +43,7 @@ tur_talimat() {
     arp)       echo "- ARP spoofing / MITM: yerel ağ segmentinde ARP zehirleme ile ortadaki adam (MITM) senaryosunu değerlendir. (L2 erişimi ve NET_ADMIN gerektirir.)" ;;
     zehirleme) echo "- Poisoning saldırıları: ARP/DNS/LLMNR/NBT-NS zehirleme (Responder tarzı) ile kimlik bilgisi yakalama olasılığını değerlendir. (L2 erişimi gerektirir.)" ;;
     dos)       echo "- Servis dayanıklılık GÖZLEMİ: yalnızca gözlemsel; hedefi çökertecek/yük bindirecek yıkıcı DoS testleri YAPMA." ;;
+    osint)     echo "- OSINT: kullanıcı adı hesap keşfi (Sherlock ile ayrıca yürütülür)." ;;
     *)         echo "- ${1}: bu kategori için genel güvenlik değerlendirmesi yap." ;;
   esac
 }
@@ -65,7 +67,7 @@ ${BLD}Hedef:${NC}
   --firma ISIM             Müşteri/firma adı (rapor için)
 
 ${BLD}Saldırı türleri:${NC}
-  ip, port, web, zafiyet, kimlik, api, ssl, dizin, arp, zehirleme, dos, hepsi
+  ip, port, web, zafiyet, kimlik, api, ssl, dizin, arp, zehirleme, dos, osint, hepsi
 
 ${BLD}Seçenekler:${NC}
   --mod quick|standard|deep   Tarama derinliği (varsayılan: standard)
@@ -74,6 +76,7 @@ ${BLD}Seçenekler:${NC}
   --kullanici KULLANICI       Kimlik doğrulamalı test için kullanıcı adı
   --parola PAROLA             Kimlik doğrulamalı test için parola
   --kimlik "kullanici:parola" Kimlik çifti (tekrarlanabilir)
+  --kullaniciadi KULLANICI    OSINT hedef kullanıcı adı (Sherlock ile hesap keşfi)
   --onizle                    Komutu çalıştırmadan sadece göster (dry-run)
   --no-pdf                    PDF üretme
   -h, --help                  Bu yardım
@@ -86,7 +89,7 @@ USAGE
 
 # ---- Argüman ayrıştırma -----------------------------------------------------
 IP=""; URL=""; APP=""; FIRMA=""; TURLER=""; MOD="standard"; BUTCE=""; EKTALIMAT=""
-KULLANICI=""; PAROLA=""; KIMLIKLER=()
+KULLANICI=""; PAROLA=""; KIMLIKLER=(); KULLANICIADI=""; OSINT_ISTE=0
 ONIZLE=0; YAP_PDF=1
 [[ $# -eq 0 ]] && { usage; exit 1; }
 while [[ $# -gt 0 ]]; do
@@ -102,6 +105,7 @@ while [[ $# -gt 0 ]]; do
     --kullanici|--kullanıcı) KULLANICI="$2"; shift 2;;
     --parola|--sifre|--şifre) PAROLA="$2"; shift 2;;
     --kimlik) KIMLIKLER+=("$2"); shift 2;;
+    --kullaniciadi|--osint) KULLANICIADI="$2"; shift 2;;
     --onizle) ONIZLE=1; shift;;
     --no-pdf) YAP_PDF=0; shift;;
     -h|--help) usage; exit 0;;
@@ -111,8 +115,8 @@ done
 
 # ---- Doğrulama --------------------------------------------------------------
 [[ -z "$TURLER" ]] && { echo "${RED}Hata: --saldiriturleri zorunlu.${NC}"; exit 1; }
-if [[ -z "$IP" && -z "$URL" ]]; then
-  echo "${RED}Hata: en az bir hedef gerekli (--ip veya --url).${NC}"; exit 1
+if [[ -z "$IP" && -z "$URL" && -z "$KULLANICIADI" ]]; then
+  echo "${RED}Hata: en az bir hedef gerekli (--ip, --url veya --kullaniciadi).${NC}"; exit 1
 fi
 [[ -z "$APP" ]] && APP="${IP:-$URL}"
 [[ -z "$FIRMA" ]] && FIRMA="Belirtilmedi"
@@ -138,14 +142,17 @@ L2_UYARI=0
 for t in "${TUR_ARR[@]}"; do
   t="$(echo "$t" | tr '[:upper:]' '[:lower:]' | xargs)"
   [[ -z "$t" ]] && continue
-  TALIMAT_GOVDE+="$(tur_talimat "$t")"$'\n'
   GECERLI_TURLER+="${t},"
+  if [[ "$t" == "osint" ]]; then OSINT_ISTE=1; continue; fi
+  TALIMAT_GOVDE+="$(tur_talimat "$t")"$'\n'
   [[ "$t" == "arp" || "$t" == "zehirleme" ]] && L2_UYARI=1
 done
+[[ -n "$KULLANICIADI" ]] && OSINT_ISTE=1
 GECERLI_TURLER="${GECERLI_TURLER%,}"
 
 # ---- Strix talimatını oluştur ----------------------------------------------
 HEDEF_METIN="${IP:+$IP }${URL:+$URL}"
+[[ -z "${HEDEF_METIN// }" && -n "$KULLANICIADI" ]] && HEDEF_METIN="kullanıcı adı: $KULLANICIADI"
 INSTRUCTION="Bu, müşterinin yazılı izniyle yürütülen YETKİLİ bir sızma testidir. Hedef: ${HEDEF_METIN}. Uygulama: ${APP}. Müşteri tarafından talep edilen test kapsamı:
 ${TALIMAT_GOVDE}
 Her doğrulanmış bulgu için önem derecesini (CVSS), etkiyi, yeniden üretim adımlarını/kanıtı ve somut çözüm önerisini raporla. Kapsam dışına çıkma; yalnızca listelenen hedefleri test et."
@@ -186,6 +193,7 @@ echo "  │ Çıktı   : $RUN_ROOT"
 echo "  └────────────────────────────────────────────────────────────"
 echo "${NC}"
 [[ ${#KIMLIKLER[@]} -gt 0 ]] && echo "${CYN}  🔑 Kimlik doğrulamalı test: ${#KIMLIKLER[@]} kimlik çifti verildi.${NC}"
+[[ $OSINT_ISTE -eq 1 && -n "$KULLANICIADI" ]] && echo "${CYN}  🕵️  OSINT hedef kullanıcı adı: ${KULLANICIADI}${NC}"
 [[ $L2_UYARI -eq 1 ]] && echo "${YEL}  ⚠ arp/zehirleme L2 ağ erişimi ve ek yetki (NET_ADMIN/host ağı) gerektirir; sandbox'ta sınırlı olabilir.${NC}"
 
 if [[ $ONIZLE -eq 1 ]]; then
@@ -194,25 +202,59 @@ if [[ $ONIZLE -eq 1 ]]; then
   exit 0
 fi
 
-# ---- Strix'i çalıştır -------------------------------------------------------
-cd "$RUN_ROOT"
-echo "${GRN}[*] Strix başlatılıyor...${NC}"
-set +e
-"$STRIX_BIN" "${STRIX_ARGS[@]}" 2>&1 | tee "$RUN_ROOT/strix_konsol.log"
-STRIX_RC=${PIPESTATUS[0]}
-set -e
-echo "${GRN}[*] Strix tamamlandı (çıkış kodu: $STRIX_RC).${NC}"
+# ---- OSINT (Sherlock) — kullanıcı adı hesap keşfi ---------------------------
+OSINT_MD=""
+if [[ $OSINT_ISTE -eq 1 && -n "$KULLANICIADI" ]]; then
+  OSINT_MD="$RUN_ROOT/osint_kullanici_kesif.md"
+  SH_TXT="$RUN_ROOT/sherlock_ciktisi.txt"
+  echo "${GRN}[*] OSINT (Sherlock) çalıştırılıyor: ${KULLANICIADI}${NC}"
+  if command -v sherlock >/dev/null 2>&1; then
+    sherlock "$KULLANICIADI" --print-found --timeout 20 --no-color > "$SH_TXT" 2>/dev/null || true
+  else
+    echo "Sherlock kurulu değil (kurulum: apt install sherlock veya pipx install sherlock-project)." > "$SH_TXT"
+  fi
+  {
+    echo "# OSINT — Kullanıcı Adı Hesap Keşfi (Sherlock)"
+    echo
+    echo "Hedef kullanıcı adı: **${KULLANICIADI}**"
+    echo
+    BULUNAN="$(grep -oiE 'https?://[^ ]+' "$SH_TXT" | sort -u)"
+    if [[ -n "$BULUNAN" ]]; then
+      ADET="$(echo "$BULUNAN" | grep -c .)"
+      echo "Sosyal medya ve çevrimiçi platformlarda **${ADET}** hesap bulundu:"
+      echo
+      echo "$BULUNAN" | sed 's/^/- /'
+    else
+      echo "_Bu kullanıcı adı için hesap bulunamadı veya Sherlock çıktı üretmedi._"
+    fi
+  } > "$OSINT_MD"
+  echo "${GRN}[*] OSINT tamamlandı.${NC}"
+fi
 
-# En son run dizinini bul
-RUN_DIR="$(ls -1dt "$RUN_ROOT"/strix_runs/*/ 2>/dev/null | head -1 || true)"
-[[ -z "$RUN_DIR" ]] && RUN_DIR="$RUN_ROOT"
+# ---- Strix'i çalıştır (hedef IP/URL varsa) ---------------------------------
+RUN_DIR="$RUN_ROOT"
+if [[ -n "$IP" || -n "$URL" ]]; then
+  cd "$RUN_ROOT"
+  echo "${GRN}[*] Strix başlatılıyor...${NC}"
+  set +e
+  "$STRIX_BIN" "${STRIX_ARGS[@]}" 2>&1 | tee "$RUN_ROOT/strix_konsol.log"
+  STRIX_RC=${PIPESTATUS[0]}
+  set -e
+  echo "${GRN}[*] Strix tamamlandı (çıkış kodu: $STRIX_RC).${NC}"
+  D="$(ls -1dt "$RUN_ROOT"/strix_runs/*/ 2>/dev/null | head -1 || true)"
+  [[ -n "$D" ]] && RUN_DIR="$D"
+else
+  echo "${YEL}[i] IP/URL verilmedi; yalnızca OSINT çalıştırıldı, Strix atlandı.${NC}"
+fi
 
 # ---- PDF üret ---------------------------------------------------------------
 if [[ $YAP_PDF -eq 1 ]]; then
   PDF_OUT="${RUN_ROOT}/Rapor_${SAFE_FIRMA}_${SAFE_APP}_${TS}.pdf"
   echo "${GRN}[*] PDF rapor oluşturuluyor...${NC}"
+  RAPOR_EK=()
+  [[ -n "$OSINT_MD" && -f "$OSINT_MD" ]] && RAPOR_EK+=(--osint-md "$OSINT_MD")
   if python3 "$RAPOR_PY" --run-dir "$RUN_DIR" --firma "$FIRMA" --uygulama "$APP" \
-       --hedef "$HEDEF_METIN" --turler "$GECERLI_TURLER" --out "$PDF_OUT"; then
+       --hedef "$HEDEF_METIN" --turler "$GECERLI_TURLER" --out "$PDF_OUT" "${RAPOR_EK[@]}"; then
     echo "${GRN}${BLD}[✓] Rapor hazır: ${NC}${PDF_OUT}"
   else
     echo "${RED}[!] PDF üretimi başarısız. Ham çıktı: $RUN_DIR${NC}"

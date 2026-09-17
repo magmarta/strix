@@ -39,6 +39,7 @@ def main(rundir):
     if params.get("parola"): cmd += ["--parola", params["parola"]]
     for _k in (params.get("kimlikler") or []):
         if _k: cmd += ["--kimlik", _k]
+    if params.get("kullaniciadi"): cmd += ["--kullaniciadi", params["kullaniciadi"]]
 
     logp = os.path.join(rundir, "console.log")
     wstatus(rundir, status="running", pid=os.getpid(), started=int(time.time()), cmd=" ".join(cmd))
