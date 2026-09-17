@@ -243,7 +243,7 @@ def build(args):
         canvas.drawString(18*mm,10*mm,f"C-Prot Siber Güvenlik · Sızma Testi Raporu · {args.firma or ''}")
         canvas.drawRightString(192*mm,10*mm,f"Sayfa {d.page}"); canvas.restoreState()
     doc.build(E,onFirstPage=footer,onLaterPages=footer)
-    print(f"[+] PDF olusturuldu: {args.out}  (md_rapor={'var' if report_md else 'yok'}, sarif_bulgu={len(findings)})")
+    print(f"[+] PDF olusturuldu: {args.out}  (md_rapor={'var' if report_md else 'yok'}, sarif_bulgu={len(findings)}, sast_bulgu={len(sast)})")
 
 if __name__=="__main__":
     ap=argparse.ArgumentParser()

@@ -251,7 +251,7 @@ if [[ $SAST_ISTE -eq 1 && -n "$KOD" ]]; then
   if [[ -e "$KOD_HEDEF" ]] && command -v semgrep >/dev/null 2>&1; then
     SAST_JSON="$RUN_ROOT/semgrep.json"
     echo "${GRN}[*] Semgrep (SAST) çalıştırılıyor: ${KOD_HEDEF}  — yerel analiz, kod dışarı çıkmaz.${NC}"
-    semgrep scan --config auto --metrics=off --json --output "$SAST_JSON" "$KOD_HEDEF" >/dev/null 2>&1 || true
+    semgrep scan --config p/default --metrics=off --json --output "$SAST_JSON" "$KOD_HEDEF" >/dev/null 2>&1 || true
     echo "${GRN}[*] Kod analizi tamamlandı.${NC}"
   else
     echo "${YEL}[i] Semgrep kurulu değil veya kod hedefi yok; SAST atlandı.${NC}"
@@ -271,7 +271,7 @@ if [[ -n "$IP" || -n "$URL" ]]; then
   D="$(ls -1dt "$RUN_ROOT"/strix_runs/*/ 2>/dev/null | head -1 || true)"
   [[ -n "$D" ]] && RUN_DIR="$D"
 else
-  echo "${YEL}[i] IP/URL verilmedi; yalnızca OSINT çalıştırıldı, Strix atlandı.${NC}"
+  echo "${YEL}[i] IP/URL verilmedi; yalnızca yerel araçlar (OSINT/SAST) çalıştırıldı, Strix atlandı.${NC}"
 fi
 
 # ---- PDF üret ---------------------------------------------------------------
